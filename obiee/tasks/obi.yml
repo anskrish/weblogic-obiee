@@ -1,0 +1,21 @@
+---
+- name: Prepare installation response file
+  template:
+    src: "install-obiee-{{ weblogic_version }}.rsp.j2"
+    dest: "{{ obiee_responce_file }}"
+#  when: not weblogic_quick_installation
+- name: Prepared the configure response file
+  template:
+    src: "install-obiee-config-{{ weblogic_version }}.rsp.j2"
+    dest: "{{ obiee_config_responce_file }}"
+
+- name: Install OBIEE Server
+  shell: /home/oracle/bi_platform-12.2.1.0.0_linux64.bin -silent -responseFile {{ obiee_responce_file }} -force
+  become_user: oracle
+  args:
+    creates: "{{ oracle.middleware_dir }}/oracle_common/oraInst.lock"
+#- name: configure OBIEE
+#  shell: "{{ oracle.middleware_dir }}/bi/bin/config.sh -silent -responseFile {{ obiee_config_responce_file }} -force"
+#  become_user: oracle
+#  args:
+#    creates: "{{ oracle.middleware_dir }}/oracle_common/oraInst.lock"

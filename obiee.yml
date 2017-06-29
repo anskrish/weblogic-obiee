@@ -1,0 +1,8 @@
+---
+
+- hosts: cli
+  roles:
+    - role: /root/obiee/obiee
+      weblogic_jar_path: '/home/oracle/fmw_12.2.1.0.0_infrastructure.jar'
+      weblogic_quick_installation: false
+      weblogic_installation_type: 'Fusion Middleware Infrastructure'

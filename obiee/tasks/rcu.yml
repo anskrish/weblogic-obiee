@@ -1,0 +1,27 @@
+---
+- name: Copy obiee_rcu_paramfile.txt 
+  copy:
+    src: templates/obiee_rcu_paramfile.txt.j2
+    dest: "{{ weblogic.scripts_dir }}/obiee_rcu_paramfile.txt"
+    owner: "{{ oracle.user }}"
+    group: "{{ oracle.group }}"
+    mode: 0750
+- name: Repository Configuration Utility (RCU)
+  shell: "{{ oracle.middleware_dir }}/oracle_common/bin/rcu -silent -createRepository -connectString 52.87.33.159:1521/repdev -dbUser SYS -dbRole SYSDBA -useSamePasswordForAllSchemaUsers true -schemaPrefix BI122120 -component STB -component IAU_APPEND -component OPSS -component UCSUMS -component BIPLATFORM -component IAU -component MDS -component IAU_VIEWER -component WLS < {{ weblogic.scripts_dir }}/obiee_rcu_paramfile.txt"
+  register: command_result
+
+- debug:
+    var: command_result
+#- name: Copy the obi-config.rsp response file
+#  copy:
+#    src: templates/obi-config.rsp.j2
+#    dest: "{{ weblogic.scripts_dir }}/obi-config.rsp"
+#    owner: "{{ oracle.user }}"
+#    group: "{{ oracle.group }}"
+#    mode: 0750
+- name: configure obiee
+  shell: "{{ oracle.middleware_dir }}/bi/bin/config.sh -silent -responseFile {{ weblogic.scripts_dir }}/obi-config.rsp -invPtrLoc {{ oracle.middleware_dir }}/oraInst.loc"
+  register: command_result1
+
+- debug:
+    var: command_result1

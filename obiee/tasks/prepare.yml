@@ -1,0 +1,103 @@
+---
+
+#
+# Prepare the operating system to the installation
+#
+- name: scp the java tar file
+  synchronize: src=obiee/files/jdk-8u131-linux-x64.tar.gz dest=/home/oracle
+- name: scp the weblogic jar file to remote machine
+  synchronize: src=obiee/files/fmw_12.2.1.0.0_infrastructure.jar dest=/home/oracle
+- name: scp the OBIEE source file 1 to remote machine
+  synchronize: src=obiee/files/bi_platform-12.2.1.0.0_linux64.bin dest=/home/oracle
+- name: scp the OBIEE source file-2 to remote machine
+  synchronize: src=obiee/files/bi_platform-12.2.1.0.0_linux64-2.zip dest=/home/oracle
+- name: Install required dependency
+  command: yum-config-manager --enable rhui-REGION-rhel-server-extras rhui-REGION-rhel-server-optional
+- name: RedHat | Install required packages
+  yum:
+    name: "{{ item }}"
+    state: present
+  with_items: "{{ rh.packages_depends }}"
+  when: ansible_os_family == 'RedHat'
+
+- name: RedHat | Disabling SELinux
+  selinux:
+    state: disabled
+  when: (ansible_os_family == 'RedHat') and (ansible_virtualization_type != 'docker')
+
+- name: RedHat | Disable firewall deamon (firewalld)
+  service: name=firewalld state=stopped enabled=no
+  when: (ansible_os_family == 'RedHat') and (ansible_virtualization_type != 'docker')
+
+- name: Change kernel parameters
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+  with_dict: "{{ kernel_params }}"
+  when: ansible_virtualization_type != 'docker'
+
+- name: Create oracle.group
+  group:
+    name: "{{ oracle.group }}"
+    state: present
+
+- name: Create oracle user
+  user:
+    name: "{{ oracle.user }}"
+    group: "{{ oracle.group }}"
+    home: "{{ oracle.home_dir }}"
+    shell: '/bin/bash'
+    state: present
+
+- name: Add open file limits for oracle user
+  lineinfile:
+    dest: '/etc/security/limits.d/99-nofile.conf'
+    line: "{{ oracle.user }} {{ item.key }} {{ item.value }}"
+    create: yes
+  with_items: "{{ sys_ulimits.nofile }}"
+  when: ansible_virtualization_type != 'docker'
+
+- name: Add open process limits for oracle user
+  lineinfile:
+    dest: '/etc/security/limits.d/99-nproc.conf'
+    line: "{{ oracle.user }} {{ item.key }} {{ item.value }}"
+    create: yes
+  with_items: "{{ sys_ulimits.nproc }}"
+  when: ansible_virtualization_type != 'docker'
+
+- name: Prepare oracle inventory parameters
+  template:
+    src: oraInst.loc.j2
+    dest: "/etc/oraInst.loc"
+
+- name: Create needed directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ oracle.user }}"
+    group: "{{ oracle.group }}"
+  with_items:
+    - "{{ weblogic.logs_dir }}"
+    - "{{ weblogic.scripts_dir }}"
+    - "{{ oracle.inventory_path }}"
+
+- name: Check if the installation Jar file exists already
+  stat:
+    path: "{{ weblogic_jar_path }}"
+  register: install_jar
+- fail:
+    msg: "No such file: '{{ weblogic_jar_path }}' !"
+  when: not install_jar.stat.exists
+
+- name: Set installation Jar file permissions
+  file:
+    path: "{{ weblogic_jar_path }}"
+    owner: "{{ oracle.user }}"
+    group: "{{ oracle.group }}"
+
+- name: Remove existing middleware home directory
+  file:
+    path: "{{ oracle.middleware_dir }}"
+    state: absent
+  when: weblogic_force_installation
